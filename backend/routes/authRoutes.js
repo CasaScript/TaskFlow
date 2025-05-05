@@ -4,7 +4,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-
+const logger = require('../utils/logger').default; // Importer le logger
 
 const userSchema = Joi.object({
     nom: Joi.string().min(3).required(),
@@ -49,6 +49,7 @@ router.post("/login", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: "Identifiants incorrects" });
+      logger.info(`Connexion réussie pour l'utilisateur ${user.email}`);
     }
 
     // Vérifier le mot de passe
@@ -78,12 +79,14 @@ router.post("/login", async (req, res) => {
 //Répondre avec le token et les informations de l'utilisateur
     res.json({ token });
   } catch (err) {
-    res.status(500).json({ error: "Erreur lors de la connexion" });
+    logger.error(`Echec de connexion depuis l'IP ${req.ip} : ${err.message}`);
+    res.status(500).json({ error: "Erreur lors de la connexion" }); 
   }
 });
 
 // Route de déconnexion
 router.post("/logout", (req, res) => {
+  logger.info(`Déconnexion de l'utilisateur ${req.user?.email}`);
   res.clearCookie("token");
   res.status(200).json({ message: "Déconnexion réussie" });
 });

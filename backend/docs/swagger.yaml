@@ -1,0 +1,403 @@
+openapi: 3.0.0
+info:
+  title: TaskFlow API
+  version: 1.0.0
+  description: |
+    API complète pour la gestion de tâches avec authentification JWT,
+    catégorisation et système de priorité.
+servers:
+  - url: http://localhost:5000/api
+    description: Environnement de développement
+  - url: https://api.taskflow.com
+    description: Environnement de production
+
+tags:
+  - name: Authentication
+    description: Gestion de l'authentification
+  - name: Users
+    description: Opérations sur les utilisateurs
+  - name: Tasks
+    description: Gestion des tâches
+  - name: Categories
+    description: Gestion des catégories
+
+paths:
+  # ======================
+  # Authentication
+  # ======================
+  /users/login:
+    post:
+      tags: [Authentication]
+      summary: Connexion d'un utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        200:
+          description: Connexion réussie
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        401:
+          description: Identifiants invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /users/register:
+    post:
+      tags: [Authentication]
+      summary: Inscription d'un nouvel utilisateur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        201:
+          description: Utilisateur créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+
+  # ======================
+  # Users
+  # ======================
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Récupère le profil de l'utilisateur connecté
+      security:
+        - JWT: []
+      responses:
+        200:
+          description: Profil utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /users/{id}:
+    put:
+      tags: [Users]
+      summary: Met à jour un utilisateur
+      security:
+        - JWT: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        200:
+          description: Utilisateur mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+    delete:
+      tags: [Users]
+      summary: Supprime un utilisateur
+      security:
+        - JWT: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Utilisateur supprimé
+
+  # ======================
+  # Tasks
+  # ======================
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Liste toutes les tâches
+      security:
+        - JWT: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [À faire, En cours, Terminé]
+        - name: priority
+          in: query
+          schema:
+            type: string
+            enum: [Basse, Moyenne, Haute]
+      responses:
+        200:
+          description: Liste des tâches
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Task"
+
+    post:
+      tags: [Tasks]
+      summary: Crée une nouvelle tâche
+      security:
+        - JWT: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskCreate"
+      responses:
+        201:
+          description: Tâche créée
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+  /tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Récupère une tâche par ID
+      security:
+        - JWT: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Détails de la tâche
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Task"
+
+    put:
+      tags: [Tasks]
+      summary: Met à jour une tâche
+      security:
+        - JWT: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TaskUpdate"
+      responses:
+        200:
+          description: Tâche mise à jour
+
+    delete:
+      tags: [Tasks]
+      summary: Supprime une tâche
+      security:
+        - JWT: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Tâche supprimée
+
+  # ======================
+  # Categories
+  # ======================
+  /categories:
+    get:
+      tags: [Categories]
+      summary: Liste toutes les catégories
+      responses:
+        200:
+          description: Liste des catégories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+    post:
+      tags: [Categories]
+      summary: Crée une nouvelle catégorie
+      security:
+        - JWT: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CategoryCreate"
+      responses:
+        201:
+          description: Catégorie créée
+
+components:
+  securitySchemes:
+    JWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ===== Authentication =====
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@taskflow.com
+        password:
+          type: string
+          example: SecurePassword123!
+
+    RegisterRequest:
+      allOf:
+        - $ref: "#/components/schemas/LoginRequest"
+        - type: object
+          required: [name]
+          properties:
+            name:
+              type: string
+              example: John Doe
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+
+    # ===== Users =====
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 507f1f77bcf86cd799439011
+        name:
+          type: string
+          example: John Doe
+        email:
+          type: string
+          format: email
+          example: user@taskflow.com
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Updated Name
+        email:
+          type: string
+          format: email
+          example: new.email@taskflow.com
+
+    # ===== Tasks =====
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 658d3e6d4c8d1a001f5e8d92
+        title:
+          type: string
+          example: "Réunion d'équipe"
+        description:
+          type: string
+          example: "Préparer l'ordre du jour"
+        status:
+          type: string
+          enum: [À faire, En cours, Terminé]
+        priority:
+          type: string
+          enum: [Basse, Moyenne, Haute]
+        dueDate:
+          type: string
+          format: date-time
+
+    TaskCreate:
+      allOf:
+        - $ref: "#/components/schemas/Task"
+        - type: object
+          required: [title]
+
+    TaskUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [À faire, En cours, Terminé]
+
+    # ===== Categories =====
+    Category:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 5f8d04b3ab35b3001763d0a5
+        name:
+          type: string
+          example: Travail
+        color:
+          type: string
+          example: "#FF5733"
+
+    CategoryCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Personnel
+        color:
+          type: string
+          example: "#33FF57"
+
+    # ===== Errors =====
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Invalid credentials"
+        details:
+          type: string
+          example: "Password doesn't match"

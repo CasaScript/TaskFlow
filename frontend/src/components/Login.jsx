@@ -2,10 +2,12 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { TextField, Button, Container, Typography } from "@mui/material";
+import { useNotification } from "../context/NotificationContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const { showNotification } = useNotification();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -15,9 +17,12 @@ const Login = () => {
         password,
       });
       localStorage.setItem("token", response.data.token);
-      alert("Connexion réussie !");
+      showNotification("Connexion réussie !", "success");
     } catch (err) {
-      alert("Erreur de connexion");
+      showNotification(
+        err.response?.data?.error || "Erreur de connexion",
+        "error"
+      );
     }
   };
 

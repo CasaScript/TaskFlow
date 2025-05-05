@@ -2,6 +2,7 @@ const express = require('express');
 const Joi = require('joi');
 const router = express.Router();
 const Task = require('../models/Task');
+const Notification = require('../models/Notification');
 const auth = require('../middleware/auth'); // Middleware d'authentification
 
 // Créer une tâche (protégé par JWT)
@@ -9,6 +10,16 @@ router.post('/', auth, async (req, res) => {
   try {
     const task = new Task({ ...req.body, utilisateur: req.user.id });
     await task.save();
+
+    // Créer une notification pour la nouvelle tâche
+    const notification = new Notification({
+      utilisateur: req.user._id,
+      message: `Nouvelle tâche créée : ${task.titre}`,
+      type: 'info',
+      lienAction: `/tasks/${task._id}`
+    });
+    await notification.save();
+
     res.status(201).send(task);
   } catch (err) {
     res.status(400).send({ error: 'Erreur lors de la création' });
@@ -93,10 +104,10 @@ const tacheSchema = Joi.object({
    */
   router.post('/', validateTache, async (req, res) => {
     try {
-      const tache = new Tache(req.body);
+      const tache = new tache(req.body);
       await tache.save();
       
-      const tachePopulee = await Tache.findById(tache._id)
+      const tachePopulee = await tache.findById(tache._id)
         .populate('utilisateur', '-motDePasse')
         .populate('categories');
         
@@ -134,14 +145,14 @@ const tacheSchema = Joi.object({
       }
   
       const [taches, total] = await Promise.all([
-        Tache.find(filter)
+        taches.find(filter)
           .populate('utilisateur', '-motDePasse')
           .populate('categories')
           .sort(sort)
           .skip(skip)
           .limit(limit)
           .lean(),
-        Tache.countDocuments(filter)
+        taches.countDocuments(filter)
       ]);
   
       res.json({
@@ -167,7 +178,7 @@ const tacheSchema = Joi.object({
    */
   router.get('/:id', validateId, async (req, res) => {
     try {
-      const tache = await Tache.findById(req.params.id)
+      const tache = await tache.findById(req.params.id)
         .populate('utilisateur', '-motDePasse')
         .populate('categories')
         .lean();
@@ -190,7 +201,7 @@ const tacheSchema = Joi.object({
    */
   router.put('/:id', [validateId, validateTache], async (req, res) => {
     try {
-      const tache = await Tache.findByIdAndUpdate(
+      const task = await Task.findByIdAndUpdate(
         req.params.id,
         { $set: req.body },
         { 
@@ -202,10 +213,33 @@ const tacheSchema = Joi.object({
       .populate('categories')
       .lean();
   
-      if (!tache) {
+      if (!task) {
         return res.status(404).json({ message: "Tâche non trouvée" });
       }
-      res.json(tache);
+
+      // Créer une notification pour la mise à jour de la tâche
+      if (req.body.statut) {
+        const notification = new Notification({
+          utilisateur: req.user._id,
+          message: `Tâche "${task.titre}" mise à jour - Statut : ${req.body.statut}`,
+          type: 'info',
+          lienAction: `/tasks/${task._id}`
+        });
+        await notification.save();
+      }
+
+      // Notification spéciale pour les tâches terminées
+      if (req.body.statut === 'Terminé') {
+        const notification = new Notification({
+          utilisateur: req.user._id,
+          message: `Félicitations ! La tâche "${task.titre}" est terminée`,
+          type: 'success',
+          lienAction: `/tasks/${task._id}`
+        });
+        await notification.save();
+      }
+
+      res.json(task);
     } catch (error) {
       res.status(500).json({ 
         message: 'Erreur lors de la mise à jour de la tâche',
@@ -220,7 +254,7 @@ const tacheSchema = Joi.object({
    */
   router.delete('/:id', validateId, async (req, res) => {
     try {
-      const tache = await Tache.findByIdAndDelete(req.params.id);
+      const tache = await tache.findByIdAndDelete(req.params.id);
       if (!tache) {
         return res.status(404).json({ message: "Tâche non trouvée" });
       }
@@ -247,14 +281,14 @@ const tacheSchema = Joi.object({
       const skip = (page - 1) * limit;
   
       const [taches, total] = await Promise.all([
-        Tache.find({ utilisateur: req.params.id })
+        taches.find({ utilisateur: req.params.id })
           .populate('utilisateur', '-motDePasse')
           .populate('categories')
           .sort({ dateCreation: -1 })
           .skip(skip)
           .limit(limit)
           .lean(),
-        Tache.countDocuments({ utilisateur: req.params.id })
+        taches.countDocuments({ utilisateur: req.params.id })
       ]);
   
       res.json({

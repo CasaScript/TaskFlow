@@ -49,7 +49,7 @@ router.get("/me", auth, async (req, res) => {
   }
 });
 
-// Mettre à jour l'utilisateur (version corrigée)
+// Mettre à jour l'utilisateur 
 router.put("/:id", auth, async (req, res) => {
   try {
     // 1. Validation Joi
