@@ -9,21 +9,27 @@ import {
   Tabs,
   IconButton,
   Drawer,
-  Fab
+  Fab,
+  Button
 } from '@mui/material';
 import { 
   Settings as SettingsIcon,
-  Add as AddIcon 
+  Add as AddIcon,
+  Logout as LogoutIcon 
 } from '@mui/icons-material';
 import NotificationsList from '../components/NotificationsList';
 import ReminderSettings from '../components/ReminderSettings';
 import TaskList from '../components/TaskList';
 import TaskForm from '../components/TaskForm';
+import { useAuth } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newTaskOpen, setNewTaskOpen] = useState(false);
+  const { logout } = useAuth();
+  const { showNotification } = useNotification();
 
   const handleTabChange = (event, newValue) => {
     setActiveTab(newValue);
@@ -33,16 +39,35 @@ const Dashboard = () => {
     setSettingsOpen(!settingsOpen);
   };
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      showNotification('Déconnexion réussie', 'success');
+    } catch (error) {
+      showNotification('Erreur lors de la déconnexion', 'error');
+    }
+  };
+
   return (
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       <Grid container spacing={3}>
-        {/* En-tête avec titre et bouton paramètres */}
+        {/* En-tête avec titre, paramètres et déconnexion */}
         <Grid item xs={12}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h4">Tableau de bord</Typography>
-            <IconButton onClick={toggleSettings} title="Paramètres des notifications">
-              <SettingsIcon />
-            </IconButton>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <IconButton onClick={toggleSettings} title="Paramètres des notifications">
+                <SettingsIcon />
+              </IconButton>
+              <Button
+                variant="outlined"
+                color="primary"
+                startIcon={<LogoutIcon />}
+                onClick={handleLogout}
+              >
+                Déconnexion
+              </Button>
+            </Box>
           </Box>
         </Grid>
 

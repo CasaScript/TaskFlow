@@ -1,10 +1,9 @@
-
 module.exports = (req, res, next) => {
     const payload = { ...req.body, ...req.query, ...req.params };
   
     // Vérifier les opérateurs MongoDB interdits
     const hasForbiddenKeys = Object.keys(payload).some((key) => 
-      key.startsWith("$") || typeof payload[key] === "object"
+      key.startsWith("$") || (typeof payload[key] === "object" && payload[key] !== null)
     );
   
     if (hasForbiddenKeys) {
@@ -14,4 +13,4 @@ module.exports = (req, res, next) => {
   
     next();
   };
-  
+

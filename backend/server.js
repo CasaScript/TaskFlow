@@ -6,48 +6,53 @@ require("dotenv").config();
 const cors = require("cors");
 const errorHandler = require("./middleware/errorHandler");
 const helmet = require("helmet");
-const cookieParser = require("cookie-parser"); 
+const cookieParser = require("cookie-parser");
 const rateLimit = require("./middleware/rateLimit");
 const morgan = require("morgan");
 const fs = require("fs");
 const path = require("path");
-const mongoSanitize = require("express-mongo-sanitize");
+// const mongoSanitize = require("express-mongo-sanitize");
 const antiNoSQLInjection = require("./middleware/antiNoSQLInjection");
-const authLimiter = require("./middleware/rateLimit"); 
+const authLimiter = require("./middleware/rateLimit");
 const app = express();
-const swaggerUI = require("swagger-ui-express");
-const YAML = require("yamljs");
-const swaggerDocument = YAML.load("./docs/swagger.yaml");
 
-app.use('/api-docs', swaggerUI.serve, swaggerUI.setup(swaggerDocument))
-
-// Middlewares de sécurité
+// CORS configuration avec options plus strictes
 app.use(cors({
-  origin: 'http://localhost:5173',
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true, // Autoriser les cookies
+  origin: ['http://localhost:3000', 'http://localhost:4000', 'http://localhost:5173'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 600 // Cache preflight requests for 10 minutes
 }));
-app.use(express.json()); // Parser le JSON
-app.use(helmet()); // Sécuriser les en-têtes HTTP
-app.use(cookieParser()); // Parser les cookies
-app.use(antiNoSQLInjection); // Middleware pour prévenir les injections NoSQL
-app.use(errorHandler); // Middleware pour gérer les erreurs
 
+// Middleware de sécurité
+app.use(cookieParser());
+app.use(express.json());
+app.use(helmet());
+// app.use(mongoSanitize({
+//   replaceWith: '_'
+// }));
+app.use(antiNoSQLInjection);
 
+// Health check endpoint en premier pour éviter les middlewares inutiles
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    timestamp: new Date().toISOString()
+  });
+});
 
-// Activer la sanitisation des données
-//app.use(mongoSanitize({
-  //replaceWith: '_', 
-  //replace: '_',  
-//}));
-
-
-
-
-// Connexion à MongoDB (avec options)
-mongoose.connect(process.env.MONGODB_URI, {})
-.then(() => console.log("Connecté à MongoDB"))
-.catch(err => console.error("Échec de connexion :", err));
+// Connexion MongoDB avec retry
+const connectWithRetry = () => {
+  mongoose.connect(process.env.MONGODB_URI, {})
+    .then(() => console.log("Connecté à MongoDB"))
+    .catch(err => {
+      console.error("Échec de connexion MongoDB:", err);
+      setTimeout(connectWithRetry, 5000);
+    });
+};
+connectWithRetry();
 
 // Routes
 const authRoutes = require("./routes/authRoutes");
@@ -56,40 +61,35 @@ const taskRoutes = require("./routes/taskRoutes");
 const categoryRoutes = require("./routes/categoryRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
 
+// Application des routes avec préfixe API
 app.use("/api/users", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/categories", categoryRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-
-
-// NoSQL Injection Prevention
-
-
-// Limiteur de taux
+// Limiteur de taux après les routes de health check
 app.use(rateLimit);
-app.use('/api/users/login', authLimiter); // Limite les requêtes de connexion à 5 par 15 minutes
-app.use('/api/users/register', authLimiter); // Limite les requêtes d'inscription à 5 par 15 minutes
+app.use('/api/users/login', authLimiter);
+app.use('/api/users/register', authLimiter);
 
-
-
-// Logger de requêtes
+// Logger configuration
 const logDirectory = path.join(__dirname, 'logs');
 if (!fs.existsSync(logDirectory)) {
   fs.mkdirSync(logDirectory);
-}   
+}
 
+const accessLogStream = fs.createWriteStream(
+  path.join(logDirectory, 'access.log'),
+  { flags: 'a' }
+);
 
-//configuration de Morgan pour enregistrer les requêtes dans un fichier
-const accessLogStream = fs .createWriteStream(path.join(logDirectory, 'access.log'), { flags: 'a' });
-//Middleware de morgan pour logger les requêtes HTTP
 app.use(morgan('combined', { stream: accessLogStream }));
-//détaillé en production
-app.use(morgan('dev'));
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
 
-// Configuration des tâches planifiées
-// Vérifier les échéances toutes les heures
+// Tâches planifiées
 schedule.scheduleJob('0 * * * *', async () => {
   await ReminderService.checkDeadlines();
 });
@@ -99,7 +99,8 @@ schedule.scheduleJob('0 9 * * *', async () => {
   await ReminderService.checkUpcomingDeadlines();
 });
 
-
+// Gestion des erreurs en dernier
+app.use(errorHandler);
 
 // Démarrage du serveur
 const PORT = process.env.PORT || 5000;
@@ -110,4 +111,4 @@ if (process.env.NODE_ENV !== "test") {
   });
 }
 
-module.exports = app; // Exporter l'application pour les tests
+module.exports = app;
